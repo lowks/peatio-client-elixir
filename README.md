@@ -1,6 +1,4 @@
-# PeatioClient
-
-**TODO: Add description**
+# PEATIO Client for Elixir
 
 ## Installation
 
@@ -9,7 +7,7 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
   1. Add peatio_client to your list of dependencies in `mix.exs`:
 
         def deps do
-          [{:peatio_client, "~> 0.0.1"}]
+          [{:peatio_client, "~> 0.1.0"}]
         end
 
   2. Ensure peatio_client is started before your application:

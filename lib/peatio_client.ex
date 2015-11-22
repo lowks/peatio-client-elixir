@@ -147,7 +147,8 @@ defmodule PeatioClient do
   #############################################################################
 
   defp process_url(url) do
-    "https://yunbi.com" <> url
+    host = Application.get_env(:peatio_client, :host) || "https://app.peatio.com"
+    host <> url
   end
 
   defp process_response_body(body) do
@@ -188,7 +189,7 @@ defmodule PeatioClient do
     %{req | payload: payload ++ new_payload}
   end
 
-  # REF: https://yunbi.com/documents/api_v2#!/members/GET_version_members_me_format
+  # REF: https://app.peatio.com/documents/api_v2#!/members/GET_version_members_me_format
   defp sign_request(req, %{key: key, secret: secret}) do
     verb = req.verb |> Atom.to_string |> String.upcase
 

@@ -2,12 +2,16 @@ defmodule PeatioClient.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :peatio_client,
-     version: "0.0.1",
-     elixir: "~> 1.1",
-     build_embedded: Mix.env == :prod,
-     start_permanent: Mix.env == :prod,
-     deps: deps]
+    [
+      app: :peatio_client,
+      version: "0.1.0",
+      elixir: "~> 1.1",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
+      description: description,
+      package: package,
+      deps: deps
+    ]
   end
 
   # Configuration for the OTP application
@@ -28,10 +32,24 @@ defmodule PeatioClient.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:cowboy, "~> 1.0"},
       {:poison, "~> 1.5"},
       {:decimal, "~> 1.1"},
       {:httpoison, "~> 0.8.0"}
+    ]
+  end
+
+  defp description do
+    """
+    Peatio Exchange compatibility API for Elixir.
+    """
+  end
+
+
+  defp package do
+    [
+      maintainers: ["hpyhacking"],
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/peatio/peatio-client-elixir"}
     ]
   end
 end
