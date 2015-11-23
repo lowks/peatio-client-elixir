@@ -1,15 +1,12 @@
-require Logger 
-
 defmodule PeatioClient do
-  use HTTPoison.Base
-  use GenServer
+  import PeatioClient.Server
 
   #############################################################################
   ### PEATIO Public API
   #############################################################################
 
   def ticker(market) do
-    body = build_api_request("/tickers/#{market}.json") |> gogogo!
+    body = build_api_request("/tickers/#{market}") |> gogogo!
     ticker = body |> Map.get("ticker") |> Enum.reduce %{}, fn
       ({key, val}, acc) ->
         key = key |> filter_key |> String.to_atom
@@ -20,7 +17,7 @@ defmodule PeatioClient do
   end
 
   def trades(market) do
-    body = build_api_request("/trades.json") |> set_payload([market: market]) |> gogogo!
+    body = build_api_request("/trades") |> set_payload([market: market]) |> gogogo!
 
     body |> Enum.map fn
       (trade) ->
@@ -61,107 +58,41 @@ defmodule PeatioClient do
         %{price: price, side: :buy, volume: volume}
     end
 
-    GenServer.call account_name(account), {:orders_multi, market, orders}
+    GenServer.call(account_name(account), {:orders_multi, market, orders})
+    |> Enum.map &convert_order/1
+  end
+
+  def orders(account, market) do
+    GenServer.call(account_name(account), {:orders, market})
+    |> Enum.map &convert_order/1
+  end
+
+  def order(account, market, order_id) do
+    GenServer.call(account_name(account), {:order, market, order_id})
+    |> convert_order
   end
 
   def cancel(account, id) when is_integer(id) do
-    GenServer.call account_name(account), {:orders_cancel, id}
+    GenServer.call(account_name(account), {:orders_cancel, id})
+    |> convert_order
   end
 
   def cancel_all(account) do
-    GenServer.call account_name(account), {:orders_cancel, :all}
+    GenServer.call(account_name(account), {:orders_cancel, :all})
+    |> Enum.map &convert_order/1
   end
 
   def cancel_ask(account) do
-    GenServer.call account_name(account), {:orders_cancel, :ask}
+    GenServer.call(account_name(account), {:orders_cancel, :ask})
+    |> Enum.map &convert_order/1
   end
 
   def cancel_bid(account) do
-    GenServer.call account_name(account), {:orders_cancel, :bid}
+    GenServer.call(account_name(account), {:orders_cancel, :bid})
+    |> Enum.map &convert_order/1
   end
 
   #############################################################################
-  ### GenServer Callback
-  #############################################################################
-
-  def start_link(account, key, secret) do
-    opts  = [name: account_name(account)]
-    GenServer.start_link(__MODULE__, %{key: key, secret: secret}, opts)
-  end
-
-  def init(auth) do
-    {:ok, %{auth: auth}}
-  end
-
-  def handle_call(:members_me, _, state = %{auth: auth}) do
-    body = build_api_request("/members/me")
-            |> sign_request(auth)
-            |> gogogo!
-    {:reply, body, state} 
-  end
-
-  def handle_call({:orders_multi, market, orders}, _, state = %{auth: auth}) do
-    payload = [market: market]
-
-    payload = orders |> Enum.reduce payload, fn
-      (%{price: p, side: s, volume: v}, acc) -> 
-        acc = acc ++ [{:"orders[][price]",  p}]
-        acc = acc ++ [{:"orders[][volume]", v}]
-        acc ++ [{:"orders[][side]",   s}]
-    end
-
-    body = build_api_request("/orders/multi", :post)
-            |> set_payload(payload) 
-            |> sign_request(auth)
-            |> gogogo!
-
-    {:reply, body, state}
-  end
-
-  def handle_call({:orders_cancel, id}, _, state = %{auth: auth}) when is_integer(id) do
-    body = build_api_request("/order/delete", :post)
-            |> set_payload([id: id]) 
-            |> sign_request(auth)
-            |> gogogo!
-
-    {:reply, body, state}
-  end
-
-  def handle_call({:orders_cancel, side}, _, state = %{auth: auth}) do
-    payload = case side do
-      :ask -> [side: "sell"]
-      :bid -> [side: "buy"]
-      _ -> []
-    end
-
-    body = build_api_request("/orders/clear", :post)
-            |> set_payload(payload) 
-            |> sign_request(auth)
-            |> gogogo!
-
-    {:reply, body, state}
-  end
-
-  #############################################################################
-  ### HTTPoison Callback and Helper
-  #############################################################################
-
-  defp process_url(url) do
-    host = Application.get_env(:peatio_client, :host) || "https://app.peatio.com"
-    host <> url
-  end
-
-  defp process_response_body(body) do
-    body |> Poison.decode!
-  end
-
-  #############################################################################
-  ### Helper and Private
-  #############################################################################
-
-  defp api_uri(path) do
-    "/api/v2" <> path
-  end
 
   defp filter_key(key) do
     case key do
@@ -171,53 +102,21 @@ defmodule PeatioClient do
     end
   end
 
-  def account_name(account) do
-    String.to_atom "#{account}.api.peatio.com"
+  defp filter_order_val(key, val) do
+    case key do
+      "avg_price" -> Decimal.new(val)
+      "price" -> Decimal.new(val)
+      "executed_volume" -> Decimal.new(val)
+      "remaining_volume" -> Decimal.new(val)
+      "volume" -> Decimal.new(val)
+      "side" -> String.to_atom(filter_key(val))
+      "market" -> String.to_atom(val)
+      "state" -> String.to_atom(val)
+      _ -> val
+    end
   end
 
-  defp build_api_request(path, verb \\ :get, tonce \\ nil) when verb == :get or verb == :post do
-    uri = api_uri(path)
-    tonce = tonce || :os.system_time(:milli_seconds) 
-    %{uri: uri, tonce: tonce, verb: verb, payload: nil}
-  end
-
-  defp set_payload(req = %{payload: nil}, payload) do
-    %{req | payload: payload}
-  end
-
-  defp set_payload(req = %{payload: payload}, new_payload) when is_list(payload) do
-    %{req | payload: payload ++ new_payload}
-  end
-
-  # REF: https://app.peatio.com/documents/api_v2#!/members/GET_version_members_me_format
-  defp sign_request(req, %{key: key, secret: secret}) do
-    verb = req.verb |> Atom.to_string |> String.upcase
-
-    payload = (req.payload || [])
-              |> Dict.put(:access_key, key)
-              |> Dict.put(:tonce, req.tonce)
-
-    query = Enum.sort(payload) |> Enum.map_join("&", fn {k, v} -> "#{k}=#{v}" end)
-
-    to_sign   = [verb, req.uri, query] |> Enum.join("|")
-    signature = :crypto.hmac(:sha256, secret, to_sign) |> Base.encode16 |> String.downcase
-
-    %{req | payload: Dict.put(payload, :signature, signature)}
-  end
-
-  defp gogogo!(%{uri: uri, verb: :get, payload: payload}) when is_list(payload) do
-    Logger.debug "GET #{uri} #{inspect payload}"
-    payload = payload |> Enum.map(fn({k, v}) -> "#{k}=#{v}" end) |> Enum.join("&")
-    get!(uri <> "?" <> payload).body
-  end
-
-  defp gogogo!(%{uri: uri, verb: :get, payload: _}) do
-    Logger.debug "GET #{uri}"
-    get!(uri).body
-  end
-
-  defp gogogo!(%{uri: uri, verb: :post, payload: payload}) do
-    Logger.debug "POST #{uri} #{inspect payload}"
-    post!(uri, {:form, payload}).body
+  defp convert_order(order) when is_map(order) do
+    for {key, val} <- order, into: %{}, do: {String.to_atom(key), filter_order_val(key, val)}
   end
 end
