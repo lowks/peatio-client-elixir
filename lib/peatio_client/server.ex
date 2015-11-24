@@ -34,7 +34,7 @@ defmodule PeatioClient.Server do
     {:reply, body, state}
   end
   
-  def handle_call({:order, market, order_id}, _, state = %{auth: auth}) do
+  def handle_call({:order, order_id}, _, state = %{auth: auth}) do
     payload = [id: order_id]
 
     body = build_api_request("/order")
@@ -63,28 +63,28 @@ defmodule PeatioClient.Server do
     {:reply, body, state}
   end
 
-  def handle_call({:orders_cancel, id}, _, state = %{auth: auth}) when is_integer(id) do
-    body = build_api_request("/order/delete", :post)
-            |> set_payload([id: id]) 
-            |> sign_request(auth)
-            |> gogogo!
+  def handle_cast({:orders_cancel, id}, state = %{auth: auth}) when is_integer(id) do
+    build_api_request("/order/delete", :post)
+    |> set_payload([id: id]) 
+    |> sign_request(auth)
+    |> gogogo!
 
-    {:reply, body, state}
+    {:noreply, state}
   end
 
-  def handle_call({:orders_cancel, side}, _, state = %{auth: auth}) do
+  def handle_cast({:orders_cancel, side}, state = %{auth: auth}) do
     payload = case side do
       :ask -> [side: "sell"]
       :bid -> [side: "buy"]
       _ -> []
     end
 
-    body = build_api_request("/orders/clear", :post)
-            |> set_payload(payload) 
-            |> sign_request(auth)
-            |> gogogo!
+    build_api_request("/orders/clear", :post)
+    |> set_payload(payload) 
+    |> sign_request(auth)
+    |> gogogo!
 
-    {:reply, body, state}
+    {:noreply, state}
   end
 
   #############################################################################

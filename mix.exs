@@ -4,7 +4,7 @@ defmodule PeatioClient.Mixfile do
   def project do
     [
       app: :peatio_client,
-      version: "0.1.1",
+      version: "0.1.2",
       elixir: "~> 1.1",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
@@ -34,6 +34,7 @@ defmodule PeatioClient.Mixfile do
     [
       {:poison, "~> 1.5"},
       {:decimal, "~> 1.1"},
+      {:hackney, "1.4.4"}, # force fixed hackney compile error
       {:httpoison, "~> 0.8.0"}
     ]
   end
@@ -43,7 +44,6 @@ defmodule PeatioClient.Mixfile do
     Peatio Exchange compatibility API for Elixir.
     """
   end
-
 
   defp package do
     [

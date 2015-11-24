@@ -67,29 +67,25 @@ defmodule PeatioClient do
     |> Enum.map &convert_order/1
   end
 
-  def order(account, market, order_id) do
-    GenServer.call(account_name(account), {:order, market, order_id})
+  def order(account, order_id) do
+    GenServer.call(account_name(account), {:order, order_id})
     |> convert_order
   end
 
   def cancel(account, id) when is_integer(id) do
-    GenServer.call(account_name(account), {:orders_cancel, id})
-    |> convert_order
+    GenServer.cast(account_name(account), {:orders_cancel, id})
   end
 
   def cancel_all(account) do
-    GenServer.call(account_name(account), {:orders_cancel, :all})
-    |> Enum.map &convert_order/1
+    GenServer.cast(account_name(account), {:orders_cancel, :all})
   end
 
   def cancel_ask(account) do
-    GenServer.call(account_name(account), {:orders_cancel, :ask})
-    |> Enum.map &convert_order/1
+    GenServer.cast(account_name(account), {:orders_cancel, :ask})
   end
 
   def cancel_bid(account) do
     GenServer.call(account_name(account), {:orders_cancel, :bid})
-    |> Enum.map &convert_order/1
   end
 
   #############################################################################
