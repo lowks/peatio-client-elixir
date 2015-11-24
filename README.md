@@ -16,7 +16,7 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
           [applications: [:peatio_client]]
         end
 
-## Useage
+## Usage
 
 More API document please visit [PEATIO API](https://app.peatio.com/documents/api_v2)
 
